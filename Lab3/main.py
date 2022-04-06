@@ -39,7 +39,7 @@ class Node:
                 if nodes == nextNode:
                     self.successive[nextNode].propagate
         else:
-            print("Error during propagation")
+            return signal
 
 class Line:
     def __init__(self, label, length):
@@ -81,5 +81,73 @@ class Network:
                 ln = Line(label, dist)
                 self.lines.update({label: ln})
 
+    def connect(self):
+        for key in self.nodes:
+            node = self.nodes[key]
+            for conn in node.connected_nodes:
+                lbl = key + conn
+                line = self.lines[lbl]
+                node.successive.update({conn: line})
+                line.successive.update({conn: self.nodes[conn]})
+
+    def find_path(self, nA, nB):
+        nodeA = self.nodes[nA]
+        nodeB = self.nodes[nB]
+
+        listaR = []
+        listaP = []
+        self.pathRec(listaR, listaP, nodeA, nodeB)
+        return listaR
+
+    def pathRec(self, listaR, listaP, nodeA, nodeB):
+        listaP.append(nodeA.label)
+        for node in nodeA.connected_nodes:
+            if node in listaP:                 #evita il backtrack
+                continue
+            if node == nodeB.label:            #se abbiamo trovato la fine
+                listaP.append(node)
+                listaR.append(listaP.copy())
+                listaP.remove(node)
+            else:
+                newnode = self.nodes[node]
+                self.pathRec(listaR, listaP, newnode, nodeB)
+        listaP.remove(nodeA.label)
+
+    def propagate(self, signal):
+        startNode = signal.nextHop()
+        self.nodes[startNode].propagate(signal)
+
+
+
+
+
+
+
+
 
 net = Network("nodes.json")
+
+lista = net.find_path("A", "E")
+print (lista)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
