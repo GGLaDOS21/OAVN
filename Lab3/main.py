@@ -1,5 +1,7 @@
 import json
 import math
+import matplotlib
+import matplotlib.pyplot as plt
 
 class Signal_information:
     def __init__(self, signal_power, path):
@@ -116,6 +118,19 @@ class Network:
     def propagate(self, signal):
         startNode = signal.nextHop()
         self.nodes[startNode].propagate(signal)
+        #verificare: il segnale dovrebbe contenere tutte le informazioni di intyerferenza
+
+    def draw(self):
+        for key in self.nodes:
+            node = self.nodes[key]
+            plt.plot(node.position[0], node.position[1], marker="o", markersize=10, markerfacecolor="white")
+            plt.annotate(key,(node.position[0], node.position[1]))
+        for key in self.nodes:
+            node = self.nodes[key]
+            for conn in node.connected_nodes:
+                node2 = self.nodes[conn]
+                plt.plot((node.position[0], node2.position[0]),(node.position[1], node2.position[1]), linestyle= '-', linewidth= 2)
+
 
 
 
@@ -127,8 +142,8 @@ class Network:
 
 net = Network("nodes.json")
 
-lista = net.find_path("A", "E")
-print (lista)
+net.draw()
+plt.show()
 
 
 
