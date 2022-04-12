@@ -3,6 +3,8 @@ import math
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
+import re
+import sys
 
 class Signal_information:
     def __init__(self, signal_power, path):
@@ -154,6 +156,50 @@ class Network:
             for conn in node.connected_nodes:
                 node2 = self.nodes[conn]
                 plt.plot((node.position[0], node2.position[0]),(node.position[1], node2.position[1]), linestyle= '-', linewidth= 2)
+    def createDataframeFromSignal(self, signalPower):
+        dict_list = {}
+        for key1 in self.nodes:
+            for key2 in self.nodes:
+                if (key1 != key2):
+                    if(key1 + key2) in dict_list:
+                        continue
+                    if(key2 + key1) in dict_list:
+                        continue
+                    dict_list.update({(key1 + key2): self.find_path(key1, key2)})
+        for key in dict_list:
+            path_list = dict_list[key]
+            for path in path_list:
+                signal = Signal_information(signalPower,path)
+                net.propagate(signal)
+                signal_data={"Latency": signal.getLatency(),"Noise": signal.getNoise(),"Signal/Noise(dB)": 10 * math.log10(signal.getPower()/signal.getNoise())}
+                l = len(path)
+                s = ""
+                for n in path:
+                    s = s + n
+                    l = l-1
+                    if l != 0:
+                        s = s + "->"
+                table_data.update({s: signal_data})
+        self.weighted_paths = pd.DataFrame(table_data)
+        return self.weighted_paths
+    def find_best_snr(self, input_node, output_node):
+        reg = re.compile("^" + re.escape(input_node) + ".*" + re.escape(output_node) + "$")
+        save = 0.0
+        for column in self.weighted_paths:
+            if re.search(reg, column) != None:
+                if self.weighted_paths[column]["Signal/Noise(dB)"] > save:
+                    save = self.weighted_paths[column]["Signal/Noise(dB)"]
+        return save
+
+    def find_best_latency(self, input_node, output_node):
+        reg = re.compile("^" + re.escape(input_node) + ".*" + re.escape(output_node) + "$")
+        save = sys.float_info.max
+        for column in self.weighted_paths:
+            if re.search(reg, column) != None:
+                if self.weighted_paths[column]["Signal/Noise(dB)"] < save:
+                    save = self.weighted_paths[column]["Signal/Noise(dB)"]
+        return save
+
 
 
 
@@ -165,24 +211,11 @@ net.connect()
 dict_list = {}
 nodes = net.get_nodes()
 table_data = {}
-for key1 in nodes:
-    for key2 in nodes:
-        if (key1 != key2):
-            if(key1 + key2) in dict_list:
-                continue
-            if(key2 + key1) in dict_list:
-                continue
-            dict_list.update({(key1 + key2): net.find_path(key1, key2)})
-for key in dict_list:
-    path_list = dict_list[key]
-    for path in path_list:
-        signal = Signal_information(1*math.pow(10,-3),path)
-        net.propagate(signal)
-        signal_data={"Latency": signal.getLatency(),"Noise": signal.getNoise(),"Signal/Noise(dB)": 10 * math.log10(signal.getPower()/signal.getNoise())}
-        table_data.update({key: signal_data})
-dataframe = pd.DataFrame(table_data)
 
-print(dataframe)
+dataframe = net.createDataframeFromSignal(0.001)
+
+net.find_best_snr("A", "C")
+
 
 
 
