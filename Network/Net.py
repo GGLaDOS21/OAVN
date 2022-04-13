@@ -65,6 +65,7 @@ class Line:
         self.label = label
         self.length = length
         self.successive = {}
+        self.state = 1
 
     def latency_generation(self, signal):
         signal.latencyUpdate(self.length/200000)
@@ -77,6 +78,12 @@ class Line:
         self.latency_generation(signal)
         node = signal.nextHop()
         self.successive[node].propagate(signal)
+
+    def getState(self):
+        return self.state
+
+    def occupy(self):
+        self.state = 0
 
 
 class Network:
@@ -166,6 +173,7 @@ class Network:
             for conn in node.connected_nodes:
                 node2 = self.nodes[conn]
                 plt.plot((node.position[0], node2.position[0]),(node.position[1], node2.position[1]), linestyle= '-', linewidth= 2)
+
     def createDataframeFromSignal(self, signalPower):
         dict_list = {}
         table_data = {}
@@ -173,8 +181,6 @@ class Network:
             for key2 in self.nodes:
                 if (key1 != key2):
                     if(key1 + key2) in dict_list:
-                        continue
-                    if(key2 + key1) in dict_list:
                         continue
                     dict_list.update({(key1 + key2): self.find_path(key1, key2)})
         for key in dict_list:
@@ -197,19 +203,53 @@ class Network:
     def find_best_snr(self, input_node, output_node):
         reg = re.compile("^" + re.escape(input_node) + ".*" + re.escape(output_node) + "$")
         save = 0.0
+        flag = 0
         for column in self.weighted_paths:
             if re.search(reg, column) != None:
                 if self.weighted_paths[column]["Signal/Noise(dB)"] > save:
-                    save = self.weighted_paths[column]["Signal/Noise(dB)"]
+                    if self.pathIsFree(column):
+                        save = self.weighted_paths[column]["Signal/Noise(dB)"]
+                        flag = 1
+        if flag == 0:
+            save = 0.0
         return save
+
+    def pathIsFree(self, searchedPath):
+
+        path = searchedPath.split("->")
+        for i in range(len(path)-1):
+            lbl1 = path[i] + path[i+1]
+            lbl2 = path[i+1] + path[i]
+            if(lbl1 in self.lines):
+                line = self.lines[lbl1]
+                if(line.getState() == 0):
+                    return False
+
+            elif(lbl2 in self.lines):
+                line = self.lines[lbl2]
+                if(line.getState() == 0):
+                    return False
+        for i in range(len(path)-1):
+            lbl1 = path[i] + path[i+1]
+            lbl2 = path[i+1] + path[i]
+            if(lbl1 in self.lines):
+                self.lines[lbl1].occupy()
+            elif(lbl2 in self.lines):
+                self.lines[lbl2].occupy()
+        return True
 
     def find_best_latency(self, input_node, output_node):
         reg = re.compile("^" + re.escape(input_node) + ".*" + re.escape(output_node) + "$")
         save = sys.float_info.max
+        flag = 0
         for column in self.weighted_paths:
             if re.search(reg, column) != None:
                 if self.weighted_paths[column]["Signal/Noise(dB)"] < save:
-                    save = self.weighted_paths[column]["Signal/Noise(dB)"]
+                    if self.pathIsFree(column):
+                        save = self.weighted_paths[column]["Signal/Noise(dB)"]
+                        flag = 1
+        if flag == 0:
+            save = None
         return save
 
     def stream(self, connectionList, label):
