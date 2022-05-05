@@ -38,6 +38,20 @@ class Signal_information:
             return None
         return self.path[0]
 
+
+class Lightpath(Signal_information):
+    def __init__(self, signal_power, path, frequency):
+        self.signal_power = signal_power
+        self.noise_power = 0.0
+        self.latency = 0.0
+        self.path = []
+        self.frequency = frequency
+        for p in path:
+            self.path.append(p)
+
+    def getFrequency(self):
+        return self.frequency
+
 class Node:
     def __init__(self, values):
         self.label = values["label"]
@@ -60,12 +74,24 @@ class Node:
         else:
             return
 
+    def probe(self, signal):            #uguale a propagate
+        if signal.pathUpdate() == self.label:
+            nextNode = signal.nextHop()
+            if(nextNode == None):
+                return
+            for nodes in self.connected_nodes:
+                if nodes == nextNode:
+                    self.successive[nextNode].probe(signal)
+                    break
+        else:
+            return
+
 class Line:
     def __init__(self, label, length):
         self.label = label
         self.length = length
         self.successive = {}
-        self.state = 1
+        self.state = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 
     def latency_generation(self, signal):
         signal.latencyUpdate(self.length/200000)
@@ -77,6 +103,7 @@ class Line:
         self.noise_generation(signal)
         self.latency_generation(signal)
         node = signal.nextHop()
+        self.state[signal.getFrequency] = 0
         self.successive[node].propagate(signal)
 
     def getState(self):
@@ -84,6 +111,12 @@ class Line:
 
     def occupy(self):
         self.state = 0
+
+    def probe(self, signal):
+        self.noise_generation(signal)
+        self.latency_generation(signal)
+        node = signal.nextHop()
+        self.successive[node].probe(signal)
 
 
 class Network:
@@ -110,6 +143,24 @@ class Network:
                 dist = math.sqrt(math.pow(node1.position[0] - node2.position[0], 2) + math.pow(node1.position[1] - node2.position[1], 2))
                 ln = Line(label, dist)
                 self.lines.update({label: ln})
+        path_dict = {}
+        for key1 in self.nodes:
+            for key2 in self.nodes:
+                if (key1 != key2):
+                    if(key1 + key2) in path_dict:
+                        continue
+                    list = self.find_path(key1, key2)
+                    for path in list:
+                        l = len(path)
+                        s = ""
+                        for n in path:
+                            s = s + n
+                            l = l-1
+                            if l != 0:
+                                s = s + "->"
+                        path_dict.update({s:  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]})
+        self.route_space = pd.DataFrame(path_dict)
+
 
     def get_nodes(self):
         return self.nodes
@@ -187,7 +238,8 @@ class Network:
             path_list = dict_list[key]
             for path in path_list:
                 signal = Signal_information(signalPower,path)
-                self.propagate(signal)
+                #self.propagate(signal) v. 1, sostituito da probe
+                self.probe(signal)
                 signal_data={"Latency": signal.getLatency(),"Noise": signal.getNoise(),"Signal/Noise(dB)": 10 * math.log10(signal.getPower()/signal.getNoise())}
                 l = len(path)
                 s = ""
@@ -207,7 +259,8 @@ class Network:
         for column in self.weighted_paths:
             if re.search(reg, column) != None:
                 if self.weighted_paths[column]["Signal/Noise(dB)"] > save:
-                    if self.pathIsFree(column):
+                    chan = self.pathIsFree(column)
+                    if chan < 10:
                         save = self.weighted_paths[column]["Signal/Noise(dB)"]
                         flag = 1
         if flag == 0:
@@ -216,27 +269,44 @@ class Network:
 
     def pathIsFree(self, searchedPath):
 
-        path = searchedPath.split("->")
-        for i in range(len(path)-1):
-            lbl1 = path[i] + path[i+1]
-            lbl2 = path[i+1] + path[i]
-            if(lbl1 in self.lines):
-                line = self.lines[lbl1]
-                if(line.getState() == 0):
-                    return False
+        #commentata prima versione, senza l'utilizzo di route_space
 
-            elif(lbl2 in self.lines):
-                line = self.lines[lbl2]
-                if(line.getState() == 0):
-                    return False
-        for i in range(len(path)-1):
-            lbl1 = path[i] + path[i+1]
-            lbl2 = path[i+1] + path[i]
-            if(lbl1 in self.lines):
-                self.lines[lbl1].occupy()
-            elif(lbl2 in self.lines):
-                self.lines[lbl2].occupy()
-        return True
+        # path = searchedPath.split("->")
+        # for i in range(len(path)-1):
+        #     lbl1 = path[i] + path[i+1]
+        #     lbl2 = path[i+1] + path[i]
+        #     if(lbl1 in self.lines):
+        #         line = self.lines[lbl1]
+        #         if(line.getState() == 0):
+        #             return False
+        #
+        #     elif(lbl2 in self.lines):
+        #         line = self.lines[lbl2]
+        #         if(line.getState() == 0):
+        #             return False
+        # for i in range(len(path)-1):
+        #     lbl1 = path[i] + path[i+1]
+        #     lbl2 = path[i+1] + path[i]
+        #     if(lbl1 in self.lines):
+        #         self.lines[lbl1].occupy()
+        #     elif(lbl2 in self.lines):
+        #         self.lines[lbl2].occupy()
+        # return True
+
+        #seconda versione, con route_space
+
+        path = searchedPath.split("->")
+        list = self.route_space[searchedPath]
+        i = 0
+        for channel in list:
+            if channel == 1:
+                channel = 0
+                return i
+            i += 1
+        return i
+
+
+
 
     def find_best_latency(self, input_node, output_node):
         reg = re.compile("^" + re.escape(input_node) + ".*" + re.escape(output_node) + "$")
@@ -245,7 +315,8 @@ class Network:
         for column in self.weighted_paths:
             if re.search(reg, column) != None:
                 if self.weighted_paths[column]["Signal/Noise(dB)"] < save:
-                    if self.pathIsFree(column):
+                    chan = self.pathIsFree(column)
+                    if chan < 10:
                         save = self.weighted_paths[column]["Signal/Noise(dB)"]
                         flag = 1
         if flag == 0:
@@ -277,14 +348,19 @@ class Network:
                 if self.weighted_paths[column]["Signal/Noise(dB)"] == snr:
                     return self.weighted_paths[column]["Latency"]
 
+    def probe(self, signal): #in questo caso è una copia di propagate
+        startNode = signal.nextHop()
+        self.nodes[startNode].probe(signal)
+
 
 class Connection:
-    def __init__(self, input_node, output_node, signal_power):
+    def __init__(self, input_node, output_node, signal_power, frequency):
         self.input = input_node
         self.output = output_node
         self.signal_power = signal_power
         self.latency = 0.0
         self.snr = 0.0
+        self.frequency = frequency
 
     def getPower(self):
         return self.signal_power

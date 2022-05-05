@@ -94,8 +94,8 @@ class Line:
     def propagate(self, signal):
         self.noise_generation(signal)
         self.latency_generation(signal)
-        if self.state[signal.getChannel] == 1:
-            self.state[signal.getChannel] = 0
+        if self.state[signal.getChannel()] == 1:
+            self.state[signal.getChannel()] = 0
         else:
             print("Errore propagazione: canale occupato")
             return
@@ -154,7 +154,7 @@ class Network:
         return lis
 
 
-    def connect(self):                          #aggiungo momentaneamente la creazione delle due tabelle qui
+    def connect(self):      #aggiungo momentaneamente la creazione delle due tabelle qui
         for key in self.nodes:
             node = self.nodes[key]
             for conn in node.connected_nodes:
@@ -196,7 +196,7 @@ class Network:
     def propagate(self, signal):
         startNode = signal.nextHop()
         self.nodes[startNode].propagate(signal)
-        #verificare: il segnale dovrebbe contenere tutte le informazioni di intyerferenza
+
 
     def draw(self):
         for key in self.nodes:
@@ -259,16 +259,6 @@ class Network:
         self.weighted_paths = pd.DataFrame(table_data)
 
 
-    # pezzo di codice per creare la stringa label con frecce
-    # l = len(path)
-    # s = ""
-    # for n in path:
-    #     s = s + n
-    #     l = l - 1
-    #     if l != 0:
-    #         s = s + "->"
-    # table_data.update({s: signal_data})
-
     def probe(self, path, pathLenght):
         node = path.pop(0)
         self.nodes[node].probe(path, pathLenght)
@@ -291,6 +281,14 @@ class Network:
                 else:
                     return False
 
+    def occupy(self, path, freq):
+        nodelist = path.split("->")
+        #sfrutto la propagate per occupare le linee
+        sign = LightPath(1, nodelist, freq)
+        self.propagate(sign)
+
+        #todo: scrivere funzione che aggiorni la tabella RouteSpace
+
 
     def find_best_snr(self, connection):
         reg = re.compile("^" + re.escape(connection.getInput()) + ".*" + re.escape(connection.getOutput()) + "$")
@@ -301,13 +299,14 @@ class Network:
                 if self.weighted_paths[column]["Signal/Noise(dB)"] > save:
                     if self.pathIsFree(column, connection.getFrequency()):
                         save = self.weighted_paths[column]["Signal/Noise(dB)"]
-                        best =column
+                        best = column
                         flag = 1
         if flag == 0:
-            save = 0.0
-            return save
-        #TO DO: aggiungere funzione per occupare percorso scelto, nella tabella e nelle linee
-        return save
+            return
+        self.occupy(best, connection.getFrequency())
+        connection.setSnr(save)
+        connection.setLatency(self.weighted_paths[best]["Latency"])
+        return
 
     def find_best_latency(self, connection):
         reg = re.compile("^" + re.escape(connection.getInput()) + ".*" + re.escape(connection.getOutput()) + "$")
