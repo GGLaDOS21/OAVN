@@ -287,7 +287,16 @@ class Network:
         sign = LightPath(1, nodelist, freq)
         self.propagate(sign)
 
-        #todo: scrivere funzione che aggiorni la tabella RouteSpace
+        #per ogni linea del percorso, ogni percorso che sfrutta quel nodo non è più disponibile a quella
+        #frequenza
+
+        for i in range(0, len(nodelist)-1):
+            reg1 = re.compile(".*" + re.escape(nodelist[i]) + "->" + re.escape(nodelist[i + 1]) + ".*")
+            reg2 = re.compile(".*" + re.escape(nodelist[i+1]) + "->" + re.escape(nodelist[i]) + ".*")
+            for route in self.routeSpace:
+                if re.search(reg1, route) is not None or re.search(reg2, route) is not None:
+                    self.routeSpace[route][freq] = 0
+
 
 
     def find_best_snr(self, connection):
@@ -295,7 +304,7 @@ class Network:
         save = 0.0
         flag = 0
         for column in self.weighted_paths:
-            if re.search(reg, column) != None:
+            if re.search(reg, column) is not None:
                 if self.weighted_paths[column]["Signal/Noise(dB)"] > save:
                     if self.pathIsFree(column, connection.getFrequency()):
                         save = self.weighted_paths[column]["Signal/Noise(dB)"]

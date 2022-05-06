@@ -8,13 +8,13 @@ class Main:
     connList = []
     nodesName = network.get_nodes_name()
     l = len(nodesName)
-    for i in range(10):
+    for i in range(100):
         n1 = n2 = 0
         while(n1 == n2):
             n1 = random.randint(0, l-1)
             n2 = random.randint(0, l-1)
             freq = random.randint(0,9)
-        connList.append(NewNet_prova.Connection(nodesName[n1], nodesName[n2], 0.001, 2))    #signal power = 0.001 W
+        connList.append(NewNet_prova.Connection(nodesName[n1], nodesName[n2], 0.001, freq))    #signal power = 0.001 W
 
 #    network.stream(connList, "latency")
 
@@ -36,21 +36,3 @@ class Main:
     plt.figure(2)
     plt.hist(plotList2, bins= 25)
     plt.show()
-
-
-#dict_list = {}
-#nodes = net.get_nodes()
-#table_data = {}
-
-#dataframe = net.createDataframeFromSignal(0.001)
-
-#net.find_best_snr("A", "C")
-
-
-
-
-
-
-
-
-
