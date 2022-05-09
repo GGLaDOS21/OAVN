@@ -1,10 +1,11 @@
 import json
 import math
-import matplotlib
+import scipy.special
 import matplotlib.pyplot as plt
 import pandas as pd
 import re
 import sys
+
 
 #NOTA:   E' stato verificata l'indipendenza completa di snr dal segnale, inoltre, la latenza può essere
 #        calcolata separatamente e post-moltiplicansola per la potenza del segnale
@@ -49,10 +50,18 @@ class Node:
         self.label = values["label"]
         self.position = values["position"]
         self.connected_nodes = values["connected_nodes"]
+        if "transceiver" in values:
+            self.transceiver = values["transceiver"]
+        else:
+            self.transceiver = "fixed-rate"
         self.successive = {}
 
     def getLabel(self):
         return self.label
+    def getTransceiverMode(self):
+        return self.transceiver
+    def setTransceiverMode(self, mode):
+        self.transceiver = mode
 
     def propagate(self, signal):
         if signal.pathUpdate() == self.label:
@@ -263,7 +272,8 @@ class Network:
         node = path.pop(0)
         self.nodes[node].probe(path, pathLenght)
 
-    def stream(self, connectionList, label):
+    def stream(self, connectionList, label):        #nota: la modifica sull'utilizzo del metodo calculate_bit_rate viene delegate ai metodi per trovare snr
+                                                    # e latenza, per ragioni di implementazione
         for connection in connectionList:
             if label == "snr":
                 self.find_best_snr(connection)
@@ -312,10 +322,15 @@ class Network:
                         flag = 1
         if flag == 0:
             return
+        node = connection.getInput()
+        mode = self.nodes[node]
+        bitRate = self.calculateBitRate(best, mode)
+        if bitRate == 0:    #connection rejected
+            return
+        connection.setBitRate(bitRate)
         self.occupy(best, connection.getFrequency())
         connection.setSnr(save)
         connection.setLatency(self.weighted_paths[best]["Latency"])
-        return
 
     def find_best_latency(self, connection):
         reg = re.compile("^" + re.escape(connection.getInput()) + ".*" + re.escape(connection.getOutput()) + "$")
@@ -323,13 +338,53 @@ class Network:
         flag = 0
         for column in self.weighted_paths:
             if re.search(reg, column) != None:
-                if self.weighted_paths[column]["Signal/Noise(dB)"] < save:
+                if self.weighted_paths[column]["Latency"] < save:
                     if self.pathIsFree(column):
-                        save = self.weighted_paths[column]["Signal/Noise(dB)"]
+                        saveLat = self.weighted_paths[column]["Latency"]
+                        saveSnr = self.weighted_paths[column]["Signal/Noise(dB)"]
+                        best = column
                         flag = 1
         if flag == 0:
-            save = None
-        return save
+            return
+        mode = connection.getInput().getTransceiverMode()
+        bitRate = self.calculateBitRate(best, mode)
+        if bitRate == 0:  # connection rejected
+            return
+        connection.setBitRate(bitRate)
+        self.occupy(best, connection.getFrequency())
+        connection.setSnr(saveSnr)
+        connection.setLatency(saveLat)
+
+    def calculateBitRate(self, path, strategy):
+        bitRate = 0
+        BER = 0.001
+        Rs = 32 * 1000000000     #rate simbolico del light path, in hertz (32 GHz)
+        Bn = 12.5 * 1000000000   #larghezza di banda del rumore, in hertz (12.5 GHz)
+
+        c1 = 2 * math.pow(scipy.special.erfcinv(2 * BER), 2) * (Rs / Bn)
+        c2 = (14/3) * math.pow(scipy.special.erfcinv( (3/2) * BER), 2) * (Rs / Bn)
+        c3 = 10 * math.pow(scipy.special.erfcinv( (8/3) * BER), 2) * (Rs / Bn)
+
+        GSNR = self.weighted_paths[path]["Signal/Noise(dB)"] # ?????
+
+        if strategy == "shannon":
+            bitRate = 2 * Rs * math.log( 1 + GSNR * (Rs/Bn) ,2)
+        elif strategy == "flex-rate":
+            if GSNR < c1:
+                bitRate = 0
+            elif c1 <= GSNR < c2:
+                bitRate = 100
+            elif c2 <= GSNR < c3:
+                bitRate = 200
+            else:
+                bitRate = 400
+        else:           #default: fixed-rate
+            if GSNR >= c1:
+                bitRate = 100
+            else:
+                bitRate = 0
+
+        return bitRate
 
 class Connection:
     def __init__(self, input_node, output_node, signal_power, frequency):
@@ -339,6 +394,7 @@ class Connection:
         self.latency = 0.0
         self.snr = 0.0
         self.frequency = frequency
+        self.bitRate = 0
 
     def getPower(self):
         return self.signal_power
@@ -363,3 +419,9 @@ class Connection:
 
     def getSnr(self):
         return self.snr
+
+    def setBitRate(self, bitRate):
+        self.bitRate = bitRate
+
+    def getBitRate(self):
+        return  self.bitRate

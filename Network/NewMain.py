@@ -30,9 +30,24 @@ class Main:
     #plot
 
 
+    # plotList2= []
+    # for conn in connList:
+    #     if conn.getSnr() != 0:
+    #         plotList2.append(conn.getSnr())
+    # plt.figure(2)
+    # plt.hist(plotList2, bins= 25)
+    # plt.show()
     plotList2= []
+    sum = 0
+    n = 0
     for conn in connList:
-        plotList2.append(conn.getSnr())
+        if conn.getBitRate() != 0:
+            sum += conn.getBitRate()
+            n += 1
+            plotList2.append(conn.getSnr())
     plt.figure(2)
     plt.hist(plotList2, bins= 25)
+    print ("Media: ")
+    print (sum / n)
     plt.show()
+
