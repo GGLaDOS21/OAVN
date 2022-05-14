@@ -1,4 +1,4 @@
-import NewNet_prova
+import NewNet
 import random
 import matplotlib.pyplot as plt
 

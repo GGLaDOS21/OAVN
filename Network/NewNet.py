@@ -1,6 +1,7 @@
 import json
 import math
 import scipy.special
+import scipy.constants as con
 import matplotlib.pyplot as plt
 import pandas as pd
 import re
@@ -19,6 +20,11 @@ class LightPath:
         self.path = []
         for p in path:
             self.path.append(p)
+        #da lab7, i seguenti sono "signal symbol rate" e ""frequency spacing between 2 consecutive channel"
+        #????????????????????'
+        self.Rs = 0.0
+        self.df = 0.0
+
     def getLatency(self):
         return self.latency
     def getNoise(self):
@@ -89,10 +95,24 @@ class Node:
 
 class Line:
     def __init__(self, label, length):
+        self.NLI = 0.0
+        self.ase = 0.0
         self.label = label
         self.length = length
         self.successive = {}
         self.state = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        self.n_amplifier = (length // 80) + 2 #un amplificatore ogni 80 km, più quelli agli estremi
+        self.gain = 16 #dB
+        self.noiseFigure = 3 #dB
+
+        #attributi fisici della fibra
+        self.alpha_dB = pow(0.2, -3)   #dB/m
+        self.alpha = self.alpha_dB/(10* math.log10(con.e))
+        self.L_eff = 1/self.alpha
+        self.beta2_module = pow(2.13, -26)  #(m*Hz^2)^-1
+        self.gamma = pow(1.27, -3)  #(m*W)^-1
+        self.Rs = pow(32, 9)    #Hz, giga
+        self.df = pow(50, 9)    #Hz, giga
 
     def latency_generation(self, signal):
         signal.latencyUpdate(self.length/200000)
@@ -127,6 +147,25 @@ class Line:
                 self.successive[nextNode].probe(path, pathLenght)
                 break
         return
+
+    def ase_Generation(self):
+        freq = pow(193.414, 12) #Hz, in questo caso teraHertz
+        h = con.h
+        Bn = pow(12.5, 9) # noise bandwith, in Hz
+
+        self.ase = self.n_amplifier * (h * freq * Bn * self.noiseFigure * (self.gain - 1))
+
+    def nli_generation(self):
+
+        #NOTA: NELLE SLIDES NON VIENE SPECIFICATA LA BASE DEL LOGARITMO IN NU_NLI
+        #NOTA2: Nch = numero di canali è stato posto = 10
+        #NOTA3: delta_f = ???? utilizzato df
+        Nch = 10
+        nu_nli = 16/(23 * con.pi) * math.log10(pow( (con.pi), 2)/2 * (self.beta2_module * pow(self.Rs, 2)) /self.alpha * Nch * (self.Rs /self.df)) * pow(self.gamma, 2) / (4* self.alpha * self.beta2_module) * 1/pow(self.Rs, 3)
+        Pch = 1 #cosa è? potenza attraversata dai canali? ma questa dipende dalla configurazione istantanea....
+        Bn = pow(12.5,9)
+        Nspan = self.length #"number of fiber span" ?? ovvero?
+        self.NLI = pow(Pch, 3) * nu_nli * Nspan * Bn
 
 class Network:
     def __init__(self, filename):
