@@ -13,6 +13,7 @@ class Line:
         self.n_amplifier = (length // 80) + 2 #un amplificatore ogni 80 km, più quelli agli estremi
         self.gain = 16 #dB
         self.noiseFigure = 3 #dB    -> F
+        self.Bn = pow(12.5, 9)
 
         #attributi fisici della fibra
         self.alpha_dB = pow(0.2, -3)   #dB/m
@@ -23,7 +24,7 @@ class Line:
         self.Rs = pow(32, 9)    #Hz, giga
         self.df = pow(50, 9)    #Hz, giga
         self.Nch = len(self.state)
-        self.nu_nli = 16/(23 * con.pi) * math.log10(pow( (con.pi), 2)/2 * (self.beta2_module * pow(self.Rs, 2)) /self.alpha * Nch * (self.Rs /self.df)) * pow(self.gamma, 2) / (4* self.alpha * self.beta2_module) * 1/pow(self.Rs, 3)
+        self.nu_nli = 16 / (23 * con.pi) * math.log10(pow(con.pi, 2) / 2 * (self.beta2_module * pow(self.Rs, 2)) / self.alpha * self.Nch * (self.Rs / self.df)) * pow(self.gamma, 2) / (4 * self.alpha * self.beta2_module) * 1 / pow(self.Rs, 3)
         self.ase_Generation()   #l'ase dipende solo dai parametri fisici, quindi è fisso per ogni linea
 
     def latency_generation(self, signal):
@@ -31,10 +32,9 @@ class Line:
 
     def noise_generation(self, signal):
         # signal.noisePowUpdate(signal.signal_power * self.length * math.pow(10, -9)) vecchia versione
-
         #nuova versione:
         self.nli_generation(signal.getPower())
-        signal.noisePowUpdate(signal.signal_power * self.NLI * self.ase)    #di questo non sono assolutamente sicuro
+        signal.noisePowUpdate (self.ase * self.Bn + self.nu_nli * pow(signal.getPower(), 3))  #di questo non sono sicuro, (Pase + nuNli*Pch^3) -> ottengo il rumore e basta
 
     def propagate(self, signal):
         self.noise_generation(signal)
@@ -53,7 +53,8 @@ class Line:
     #def occupy(self):
     #    self.state = 0
 
-    def probe(self, path, pathLenght):
+
+    def probe(self, path, pathLenght):      #usato per creare la weightened table
         pathLenght[0] += self.length
         if len(path) == 0:
             return
@@ -75,7 +76,7 @@ class Line:
 
         Bn = pow(12.5,9)
         Nspan = self.n_amplifier - 1     #"number of fiber span" -> ovvero il numero di tratti di fibra della linea = numero mplificatori - 1
-        self.NLI = pow(power, 3) * nu_nli * Nspan * Bn
+        self.NLI = pow(power, 3) * self.nu_nli * Nspan * Bn
 
     def optimized_launch_power(self):       #NOTA: problema: nelle richieste delle slide, viene detto di chiamare il metodo in propagate di Node; tuttavia, calcolato in questo modo, il launch power
                                             #è indipendente dal nodo o dal segnale specifico da cui è lanciato; non ha dunque senso ricalcolarlo ad ogni propagate

@@ -18,6 +18,7 @@ class Node:
     def setTransceiverMode(self, mode):
         self.transceiver = mode
 
+    #TO_DO: provare a impostare la potenza di ingresso della linea = alla optimized launch power
     def propagate(self, signal):
         if signal.pathUpdate() == self.label:
             nextNode = signal.nextHop()
@@ -30,7 +31,7 @@ class Node:
         else:
             return
 
-    def probe(self, path, pathLenght):
+    def probe(self, path, pathLenght):          #usato pre creare la weightened table
         if len(path) == 0:
             return
         nextNode = path[0]

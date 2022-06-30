@@ -1,4 +1,15 @@
 import Signal_Information
+import pandas as pd
+import matplotlib.pyplot as plt
+import re
+import sys
+import scipy.special
+import json
+import Node
+import math
+import Line
+
+
 
 class Network:
     def __init__(self, filename):
@@ -152,8 +163,15 @@ class Network:
             else:
                 best = self.find_best_latency(connection.getInput(), connection.getOutput(), connection.getFrequency)
             if best is not None:
-                connection.setSnr(self.weighted_paths[best]["Signal/Noise(dB)"])
-                connection.setLatency(self.weighted_paths[best]["Latency"])
+                bitrate = self.calculateBitRate(best, self.nodes[connection.getInput].getTransceiverMode())
+                if bitrate != 0:
+                    connection.setBitRate(bitrate)
+                    connection.setSnr(self.weighted_paths[best]["Signal/Noise(dB)"])
+                    connection.setLatency(self.weighted_paths[best]["Latency"])
+                    self.occupy(best, connection.getFrequency())
+                else:
+                    print("Connessione rifiutata")
+
 
 
 
@@ -197,13 +215,6 @@ class Network:
                         flag = 1
         if flag == 0:
             return None
-
-        # mode = self.nodes[node]
-        # bitRate = self.calculateBitRate(best, mode)
-        # if bitRate == 0:    #connection rejected
-        #     return
-        # connection.setBitRate(bitRate)
-        self.occupy(best, frequency)
         return best
 
     def find_best_latency(self, input, output, frequency):
@@ -211,22 +222,16 @@ class Network:
         save = sys.float_info.max
         flag = 0
         for column in self.weighted_paths:
-            if re.search(reg, column) != None:
+            if re.search(reg, column) is not None:
                 if self.weighted_paths[column]["Latency"] < save:
-                    if self.pathIsFree(column):
+                    if self.pathIsFree(column, frequency):
                         best = column
                         flag = 1
         if flag == 0:
             return None
-        # mode = connection.getInput().getTransceiverMode()
-        # bitRate = self.calculateBitRate(best, mode)
-        # if bitRate == 0:  # connection rejected
-        #     return
-        # connection.setBitRate(bitRate)
-        self.occupy(best, frequency)
         return best
 
-    def calculateBitRate(self, lightpath, strategy):
+    def calculateBitRate(self, path, strategy):
         bitRate = 0
         BER = 0.001
         Rs = 32 * 1000000000     #rate simbolico del light path, in hertz (32 GHz)
