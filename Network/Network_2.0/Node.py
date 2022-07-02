@@ -18,14 +18,16 @@ class Node:
     def setTransceiverMode(self, mode):
         self.transceiver = mode
 
-    #TO_DO: provare a impostare la potenza di ingresso della linea = alla optimized launch power
+
     def propagate(self, signal):
         if signal.pathUpdate() == self.label:
             nextNode = signal.nextHop()
-            if(nextNode == None):
+            if nextNode is None:
                 return
             for nodes in self.connected_nodes:
                 if nodes == nextNode:
+                    opt_power = self.successive[nextNode].get_optimal_power()   #il nodo legge la potenza ottimale della linea
+                    signal.setPower(opt_power)                                  #e imposta la potenza del segnale di conseguenza
                     self.successive[nextNode].propagate(signal)
                     break
         else:

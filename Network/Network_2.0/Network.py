@@ -1,13 +1,16 @@
-import Signal_Information
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
 import sys
 import scipy.special
 import json
-import Node
 import math
-import Line
+import time
+from Signal_Information import Signal_Information
+from Node import Node
+from Line import Line
+import random
+from Connection import Connection
 
 
 
@@ -35,6 +38,7 @@ class Network:
                 dist = math.sqrt(math.pow(node1.position[0] - node2.position[0], 2) + math.pow(node1.position[1] - node2.position[1], 2))
                 ln = Line(label, dist)
                 self.lines.update({label: ln})
+        self.logger = pd.DataFrame(index=["epoch time", "path", "channel ID", "bit rate"])
 
     def get_nodes(self):
         return self.nodes
@@ -101,6 +105,7 @@ class Network:
                 node2 = self.nodes[conn]
                 plt.plot((node.position[0], node2.position[0]),(node.position[1], node2.position[1]), linestyle= '-', linewidth= 2)
 
+    #TODO: implementare dijkstra
     def createRouteSpace(self):
         dict_list = {}
         for key1 in self.nodes:
@@ -155,25 +160,25 @@ class Network:
         node = path.pop(0)
         self.nodes[node].probe(path, pathLenght)
 
-    def stream(self, connectionList, label):        #nota: la modifica sull'utilizzo del metodo calculate_bit_rate viene delegate ai metodi per trovare snr
-                                                    # e latenza, per ragioni di implementazione
+    def stream(self, connectionList, label):
         for connection in connectionList:
             if label == "snr":
-                best = self.find_best_snr(connection.getInput(), connection.getOutput(), connection.getFrequency)
+                best = self.find_best_snr(connection.getInput(), connection.getOutput(), connection.getFrequency())
             else:
-                best = self.find_best_latency(connection.getInput(), connection.getOutput(), connection.getFrequency)
+                best = self.find_best_latency(connection.getInput(), connection.getOutput(), connection.getFrequency())
             if best is not None:
-                bitrate = self.calculateBitRate(best, self.nodes[connection.getInput].getTransceiverMode())
+                sign = Signal_Information(connection.getPower(), best.split("->"), connection.getFrequency())
+                connection.addLightPath(sign)
+                self.propagate(sign)
+                bitrate = self.calculateBitRate(sign, self.nodes[connection.getInput()].getTransceiverMode())
                 if bitrate != 0:
                     connection.setBitRate(bitrate)
                     connection.setSnr(self.weighted_paths[best]["Signal/Noise(dB)"])
                     connection.setLatency(self.weighted_paths[best]["Latency"])
                     self.occupy(best, connection.getFrequency())
+                    self.update_logger(connection)
                 else:
                     print("Connessione rifiutata")
-
-
-
 
     def pathIsFree(self, searchedPath, freq):
 
@@ -185,13 +190,9 @@ class Network:
                     return False
 
     def occupy(self, path, freq):
-        # sfrutto la propagate per occupare le linee, inviando un segnale di potenza 1 e freq opportuna
         nodelist = path.split("->")
-        sign = Signal_Information(1, nodelist, freq)
-        self.propagate(sign)
-
         #per ogni linea del percorso, ogni percorso che sfrutta quella linea non è più disponibile a quella
-        #frequenza
+        #frequenza, e il canale della linea deve risultare occupato
 
         for i in range(0, len(nodelist)-1):
             reg1 = re.compile(".*" + re.escape(nodelist[i]) + "->" + re.escape(nodelist[i + 1]) + ".*")
@@ -199,6 +200,13 @@ class Network:
             for route in self.routeSpace:
                 if re.search(reg1, route) is not None or re.search(reg2, route) is not None:
                     self.routeSpace[route][freq] = 0
+            for name in self.lines:
+                line= self.lines[name]
+                if line.getLabel() == (nodelist[i] + nodelist[i+1]) or line.getLabel() == (nodelist[i+1] + nodelist[i]):
+                    line.occupy_state(freq)
+                    break
+
+
 
 
 
@@ -231,17 +239,17 @@ class Network:
             return None
         return best
 
-    def calculateBitRate(self, path, strategy):
+    def calculateBitRate(self, lp, strategy):
         bitRate = 0
         BER = 0.001
-        Rs = 32 * 1000000000     #rate simbolico del light path, in hertz (32 GHz)
+        Rs = lp.getRs()     #32 * 1000000000     #rate simbolico del light path, in hertz (32 GHz)
         Bn = 12.5 * 1000000000   #larghezza di banda del rumore, in hertz (12.5 GHz)
 
         c1 = 2 * math.pow(scipy.special.erfcinv(2 * BER), 2) * (Rs / Bn)
         c2 = (14/3) * math.pow(scipy.special.erfcinv( (3/2) * BER), 2) * (Rs / Bn)
         c3 = 10 * math.pow(scipy.special.erfcinv( (8/3) * BER), 2) * (Rs / Bn)
 
-        GSNR = self.weighted_paths[path]["Signal/Noise(dB)"] # ?????
+        GSNR = self.calculateGSNR(lp)
 
         if strategy == "shannon":
             bitRate = 2 * Rs * math.log( 1 + GSNR * (Rs/Bn) ,2)
@@ -261,3 +269,87 @@ class Network:
                 bitRate = 0
 
         return bitRate
+
+
+    def calculateGSNR(self, lp):
+        initialPower = lp.getInitialPower()
+        GSNR = initialPower / lp.getNoise()
+        return GSNR
+
+    def streamByMatrix(self, matrix, label):    #come per stream, serve una label che specifichi il metodo di selezione
+        node_name_list = []
+        tentativi = 0
+        M=1
+        conn_list = []
+        for n in self.nodes:
+            node_name_list.append(n)
+        l = len(self.nodes)
+        Bn = 12.5 * 1000000000  # larghezza di banda del rumore, in hertz (12.5 GHz)
+        while tentativi < 20:
+            n1 = n2 = 0
+            while n1 == n2:
+                n1 = random.randint(0, l-1)
+                n2 = random.randint(0, l-1)
+            if matrix[node_name_list[n1]][node_name_list[n2]] != 0:
+                conn_bit_rate = 100*M
+                if matrix[node_name_list[n1]][node_name_list[n2]] >= conn_bit_rate:     #ovvero se c'è ancora disponibilità di traffico tra i due nodi
+                    freq = random.randint(0, 9)
+                    if label == "snr":
+                        best = self.find_best_snr(node_name_list[n1], node_name_list[n2],freq)
+                    else:
+                        best = self.find_best_latency(node_name_list[n1], node_name_list[n2],freq)
+                    if best is not None:
+                        sign = Signal_Information(0.001, best.split("->"), freq)
+                        connection = Connection(node_name_list[n1], node_name_list[n2], 0.001, freq)
+                        connection.addLightPath(sign)
+                        self.propagate(sign)
+                        bitrate = self.calculateBitRate(sign, self.nodes[connection.getInput()].getTransceiverMode())
+                        if bitrate !=0 and bitrate <= conn_bit_rate:    #ipotesi: anche un bitrate inferiore a quello richiesto va bene
+                            connection.setBitRate(bitrate)
+                            connection.setSnr(self.weighted_paths[best]["Signal/Noise(dB)"])
+                            connection.setLatency(self.weighted_paths[best]["Latency"])
+                            self.occupy(best, connection.getFrequency())
+                            matrix[node_name_list[n1]][node_name_list[n2]] = matrix[node_name_list[n1]][node_name_list[n2]] - bitrate
+                            M = M+1
+                            tentativi = 0
+                            conn_list.append(connection)
+                            if self.check_availability(M,matrix,node_name_list) == 0:
+                                print("Rete satura")
+                                return conn_list
+                    else:   #ovvero se best non è stato trovato (percorso non disponibile/frequenza non disponibile)
+                        tentativi = tentativi + 1
+                else:   #ovvero se è stata estratta una coppia tra i quali non c'è più disponibilità
+                    tentativi = tentativi + 1
+        print("Tentativi esauriti")
+        return conn_list
+
+
+    def check_availability(self, M, matrix, node_list):
+        l=len(node_list)
+        for i in range (0, l-1):
+            for j in range (0, l-1):
+                if matrix[node_list[i]][node_list[j]] > M*100:
+                    return 1    #c'è ancora disponibilità
+        return 0
+
+    def update_logger(self, conn):
+        t= time.time_ns()
+        self.logger.append(t, conn.getLight().getPath(), conn.getFrequency(), conn.getBitRate())
+
+    def strong_failure(self, label):
+        self.lines[label].setOutOfOrder()
+        node=list(label)
+        reg1 = re.compile(".*" + re.escape(node[0]) + "->" + re.escape(node[1]) + ".*")
+        reg2 = re.compile(".*" + re.escape(node[1]) + "->" + re.escape(node[0]) + ".*")
+        for route in self.routeSpace:
+            if re.search(reg1, route) is not None or re.search(reg2, route) is not None:
+                for freq in range(0,9):
+                    self.routeSpace[route][freq] = 0
+
+    def traffic_recovery(self):
+        #dovrei valutare ogni log nel logger, verificare se è possibile spostare
+        # la connessione sulle linee funzionanti
+
+
+
+

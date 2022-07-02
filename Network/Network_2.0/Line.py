@@ -14,18 +14,24 @@ class Line:
         self.gain = 16 #dB
         self.noiseFigure = 3 #dB    -> F
         self.Bn = pow(12.5, 9)
+        self.in_service = 1     #1->in service  0-> out of service
 
         #attributi fisici della fibra
         self.alpha_dB = pow(0.2, -3)   #dB/m
-        self.alpha = self.alpha_dB/(20* math.log10(con.e))
+        self.alpha = self.alpha_dB/(20* math.log10(2.718281828))
         self.L_eff = 1/self.alpha
         self.beta2_module = pow(2.13, -26)  #(m*Hz^2)^-1
         self.gamma = pow(1.27, -3)  #(m*W)^-1
         self.Rs = pow(32, 9)    #Hz, giga
         self.df = pow(50, 9)    #Hz, giga
         self.Nch = len(self.state)
-        self.nu_nli = 16 / (23 * con.pi) * math.log10(pow(con.pi, 2) / 2 * (self.beta2_module * pow(self.Rs, 2)) / self.alpha * self.Nch * (self.Rs / self.df)) * pow(self.gamma, 2) / (4 * self.alpha * self.beta2_module) * 1 / pow(self.Rs, 3)
+
+        self.nu_nli = 16 / (27 * con.pi) * math.log10(pow(con.pi, 2) / 2 * (self.beta2_module * pow(self.Rs, 2)) / self.alpha * pow(self.Nch, 2 * self.Rs / self.df)) * pow(self.gamma, 2) / (4 * self.alpha * self.beta2_module) * 1 / pow(self.Rs, 3)
         self.ase_Generation()   #l'ase dipende solo dai parametri fisici, quindi è fisso per ogni linea
+        self.optimized_launch_power()
+
+    def getLabel(self):
+        return self.label
 
     def latency_generation(self, signal):
         signal.latencyUpdate(self.length/200000)
@@ -34,14 +40,14 @@ class Line:
         # signal.noisePowUpdate(signal.signal_power * self.length * math.pow(10, -9)) vecchia versione
         #nuova versione:
         self.nli_generation(signal.getPower())
+        #noise = 2/3 * pow(2 * self.nu_nli * self.Bn * pow(self.noiseFigure * self.L_eff * self.ase * self.Bn, 2) ,1/3)
         signal.noisePowUpdate (self.ase * self.Bn + self.nu_nli * pow(signal.getPower(), 3))  #di questo non sono sicuro, (Pase + nuNli*Pch^3) -> ottengo il rumore e basta
+
 
     def propagate(self, signal):
         self.noise_generation(signal)
         self.latency_generation(signal)
-        if self.state[signal.getChannel()] == 1:
-            self.state[signal.getChannel()] = 0
-        else:
+        if self.state[signal.getChannel()] == 0:    #l'update dello stato del canale viene fatto altrove, nella occupy
             print("Errore propagazione: canale occupato")
             return
         node = signal.nextHop()
@@ -50,8 +56,11 @@ class Line:
     def getState(self):
         return self.state
 
-    #def occupy(self):
-    #    self.state = 0
+    def get_optimal_power(self):
+        return self.opt_pow
+
+    def occupy_state(self, freq):
+        self.state[freq] = 0
 
 
     def probe(self, path, pathLenght):      #usato per creare la weightened table
@@ -83,3 +92,6 @@ class Line:
         #                            F                  L                      Gase
         #                           \/                  \/                      \/
         self.opt_pow=pow( (self.noiseFigure * (self.alpha * self.length) * self.ase) / (2 * self.nu_nli), 1/3)
+
+    def setOutOfOrder(self):
+        self.in_service = 0

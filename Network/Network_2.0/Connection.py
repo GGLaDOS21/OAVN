@@ -2,6 +2,7 @@
 
 class Connection:
     def __init__(self, input_node, output_node, signal_power, frequency):
+        self.LightPath = None
         self.input = input_node
         self.output = output_node
         self.signal_power = signal_power
@@ -39,3 +40,9 @@ class Connection:
 
     def getBitRate(self):
         return  self.bitRate
+
+    def addLightPath(self, lp):
+        self.LightPath = lp
+
+    def getLight(self):
+        return self.LightPath

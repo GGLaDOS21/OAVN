@@ -1,12 +1,15 @@
 
 
 
-class Signal_Information:
-    def __init__(self, signal_power, path):
+class Signal_Information: #AKA lightpath
+    def __init__(self, signal_power, path, channel):
         self.signal_power = signal_power
+        self.start_power = signal_power
         self.noise_power = 0.0
         self.latency = 0.0
         self.path = []
+        self.channel = channel
+
         for p in path:
             self.path.append(p)
         self.Rs = 0.0   #signal symbol rate
@@ -18,11 +21,14 @@ class Signal_Information:
         return self.noise_power
     def getPower(self):
         return self.signal_power
+    def getRs(self):
+        return self.Rs
+    def getInitialPower(self):
+        return self.start_power
     def getChannel(self):
         return self.channel
-
-    def sigPowUpdate(self, increment):
-        self.signal_power += increment
+    def setPower(self, power):
+        self.signal_power = power
 
     def noisePowUpdate(self, increment):
         self.noise_power += increment
@@ -37,3 +43,6 @@ class Signal_Information:
         if len(self.path) == 0:
             return None
         return self.path[0]
+
+    def getPath(self):
+        return self.path
