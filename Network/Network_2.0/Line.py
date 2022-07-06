@@ -74,6 +74,12 @@ class Line:
     def occupy_state(self, freq):
         self.state[freq] = 0
 
+    def getInNode(self):
+        return self.in_node
+
+    def getOutNode(self):
+        return self.out_node
+
 
     def probe(self, path, pathLenght, signal):      #usato per creare la weightened table
         pathLenght[0] += self.length
@@ -115,3 +121,13 @@ class Line:
 
     def setOutOfOrder(self):
         self.in_service = 0
+
+    def getServiceStatus(self):
+        return self.in_service
+
+    def resetChannel(self, ch):
+        self.state[ch] = 1
+
+    def no_ch_avail(self):
+        for i in range(0,10):
+            self.state[i] = 0

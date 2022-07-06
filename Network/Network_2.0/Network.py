@@ -388,10 +388,9 @@ class Network:
     def strong_failure(self, label):
         self.lines[label].setOutOfOrder()
         node = list(label)
-        reg1 = re.compile(".*" + re.escape(node[0]) + "->" + re.escape(node[1]) + ".*")
-        reg2 = re.compile(".*" + re.escape(node[1]) + "->" + re.escape(node[0]) + ".*")
+        reg = re.compile(".*" + re.escape(node[0]) + "->" + re.escape(node[1]) + ".*")
         for route in self.routeSpace:
-            if re.search(reg1, route) is not None or re.search(reg2, route) is not None:
+            if re.search(reg, route) is not None:
                 for freq in range(0, 9):
                     self.routeSpace[route][freq] = 0
 
@@ -404,6 +403,22 @@ class Network:
                 non_operative_lines.append(l)
         for index, row in self.logger.iterrows():
             for line in non_operative_lines:
-                if line in row["path"]:  # è certamente errato così, ma il senso di ciò che bisogna fare è questo
-                    # creare nuova connessione, se possibile, tra i nodi di input e output, che non passi dalla linea interrotta
-                    a = 0
+                reg = re.compile(".*" + re.escape(self.lines[line].getInNode().getLabel()) + "->" + re.escape(self.lines[line].getOutNode().getLabel()) + ".*")
+                if re.search(reg, row["path"]) is not None:
+                    path = row["path"].split("->")
+                    startNode=path[0]
+                    endNode=path[len(path)-1]
+                    matrix[startNode][endNode] = matrix[startNode][endNode] + row["bit rate"]
+                    for i in range(0,len(path)-1):
+                        self.lines[path[i] + path[i+1]].resetChannel(row["channel ID"])
+        self.check_lines_out_of_order()
+
+
+
+
+    def check_lines_out_of_order(self):
+        for l in self.lines:
+            if self.lines[l].getServiceStatus() == 0:
+                self.lines[l].no_ch_avail()
+
+

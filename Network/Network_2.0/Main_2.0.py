@@ -64,8 +64,11 @@ class Main:
     print(net_matrix)
     conn_list = network.streamByMatrix(net_matrix, "snr")
     print(net_matrix)
-
-
+    network.strong_failure("DC")
+    network.traffic_recovery(net_matrix)
+    print(net_matrix)
+    conn_list2 = network.streamByMatrix(net_matrix, "snr")
+    print(net_matrix)
 
 
 
