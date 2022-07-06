@@ -8,7 +8,8 @@
   "position": [
    -350e3,
    150e3
-  ]
+  ],
+  "transceiver": "flex-rate"
  },
  "B": {
   "connected_nodes": [
@@ -19,7 +20,8 @@
   "position": [
    -100e3,
    400e3
-  ]
+  ],
+  "transceiver": "flex-rate"
  },
  "C": {
   "connected_nodes": [
@@ -30,7 +32,8 @@
   "position": [
    -200e3,
    -300e3
-  ]
+  ],
+  "transceiver": "flex-rate"
  },
  "D": {
   "connected_nodes": [
@@ -43,7 +46,8 @@
   "position": [
    0,
    0
-  ]
+  ],
+  "transceiver": "flex-rate"
  },
  "E": {
   "connected_nodes": [
@@ -54,7 +58,8 @@
   "position": [
    150e3,
    -350e3
-  ]
+  ],
+  "transceiver": "flex-rate"
  },
  "F": {
   "connected_nodes": [
@@ -65,6 +70,7 @@
   "position": [
    300e3,
    250e3
-  ]
+  ],
+  "transceiver": "flex-rate"
  }
 }

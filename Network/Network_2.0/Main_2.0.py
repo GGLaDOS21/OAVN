@@ -3,22 +3,20 @@ from Connection import Connection
 import random
 import matplotlib.pyplot as plt
 import pandas as pd
-
 class Main:
     network = Network("nodes.json")
     network.connect()
     connList = []
     nodesName = network.get_nodes_name()
-    l = len(nodesName)
+    # l = len(nodesName)
     # for i in range(100):
     #     n1 = n2 = 0
     #     while n1 == n2:
     #         n1 = random.randint(0, l-1)
     #         n2 = random.randint(0, l-1)
-    #         freq = random.randint(0,9)
-    #     connList.append(Connection(nodesName[n1], nodesName[n2], 0.001, freq))    #signal power = 0.001 W
-
-#    network.stream(connList, "latency")
+    #     connList.append(Connection(nodesName[n1], nodesName[n2], 0.001))    #signal power = 0.001 W
+    #
+    # network.stream(connList, "latency")
 
     #plot
 #    plotList1= []
@@ -56,15 +54,16 @@ class Main:
     # plt.show()
 
     net_matrix = pd.DataFrame(0, index= nodesName, columns= nodesName)
+    M=10
     for na in nodesName:
         for nb in nodesName:
-            net_matrix[na][nb] = random.randint(0,10)*1000
-    #print(net_matrix)
-    old_matrix = net_matrix.copy()
-
+            if na == nb:
+                net_matrix[na][nb] = 0
+            else:
+                net_matrix[na][nb] = M*100
+    print(net_matrix)
     conn_list = network.streamByMatrix(net_matrix, "snr")
-    comparison = old_matrix.compare(net_matrix)
-    print(comparison)
+    print(net_matrix)
 
 
 

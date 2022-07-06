@@ -1,14 +1,14 @@
 
 
 class Connection:
-    def __init__(self, input_node, output_node, signal_power, frequency):
+    def __init__(self, input_node, output_node, signal_power):
         self.LightPath = None
         self.input = input_node
         self.output = output_node
         self.signal_power = signal_power
         self.latency = 0.0
         self.snr = 0.0
-        self.frequency = frequency
+        self.frequency = None
         self.bitRate = 0
 
     def getPower(self):
@@ -16,6 +16,9 @@ class Connection:
 
     def getFrequency(self):
         return self.frequency
+
+    def setFrequency(self, fr):
+        self.frequency = fr
 
     def getInput(self):
         return self.input
@@ -43,6 +46,7 @@ class Connection:
 
     def addLightPath(self, lp):
         self.LightPath = lp
+        self.frequency = lp.getChannel()
 
     def getLight(self):
         return self.LightPath

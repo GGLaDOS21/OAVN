@@ -2,13 +2,13 @@
 
 
 class Signal_Information: #AKA lightpath
-    def __init__(self, signal_power, path, channel):
+    def __init__(self, signal_power, path):
         self.signal_power = signal_power
-        self.start_power = signal_power
         self.noise_power = 0.0
         self.latency = 0.0
         self.path = []
-        self.channel = channel
+        self.channel = None
+        self.pos = 0
 
         for p in path:
             self.path.append(p)
@@ -23,8 +23,10 @@ class Signal_Information: #AKA lightpath
         return self.signal_power
     def getRs(self):
         return self.Rs
-    def getInitialPower(self):
-        return self.start_power
+    def setRS(self,rs):
+        self.Rs = rs
+    def setCnannel(self, channel):
+        self.channel = channel
     def getChannel(self):
         return self.channel
     def setPower(self, power):
@@ -36,13 +38,25 @@ class Signal_Information: #AKA lightpath
     def latencyUpdate(self, increment):
         self.latency += increment
 
-    def pathUpdate(self):
-        return self.path.pop(0)
+
 
     def nextHop(self):
-        if len(self.path) == 0:
+        if len(self.path) == self.pos:
             return None
-        return self.path[0]
+        ret = self.pos
+        self.pos = self.pos + 1
+        return self.path[ret]
+
+    def nextNode(self):     #chiamato solo dalla propagate in line
+        return self.path[self.pos-1]
 
     def getPath(self):
         return self.path
+
+    def getPath_with_arrow(self):
+        s= ""
+        for i in range(0, len(self.path)):
+            s = s+self.path[i]
+            if i != (len(self.path)-1):
+                s = s + "->"
+        return s
