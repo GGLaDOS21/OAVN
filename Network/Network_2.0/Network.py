@@ -15,6 +15,7 @@ from Connection import Connection
 
 class Network:
     def __init__(self, filename):
+        self.weighted_paths = None
         self.routeSpace = None
         self.nodes = {}
         self.lines = {}
@@ -39,7 +40,6 @@ class Network:
                 ln = Line(label, dist, node1, node2)
                 self.lines.update({label: ln})
         self.logger = pd.DataFrame()
-        #self.logger = pd.DataFrame(index=["epoch time", "path", "channel ID", "bit rate"])
 
     def get_nodes(self):
         return self.nodes
@@ -60,7 +60,7 @@ class Network:
                     node.successive.update({conn: line})
         self.createRouteSpace()
         self.createWeightenedTable()
-        a=6
+        a = 6
 
     def find_path(self, nA, nB):
         nodeA = self.nodes[nA]
@@ -100,6 +100,7 @@ class Network:
                 node2 = self.nodes[conn]
                 plt.plot((node.position[0], node2.position[0]), (node.position[1], node2.position[1]), linestyle='-',
                          linewidth=2)
+        plt.show()
 
     def createRouteSpace(self):
         dict_list = {}
@@ -123,7 +124,7 @@ class Network:
                 table_data.update({s: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]})
         self.routeSpace = pd.DataFrame(table_data)
 
-    def createWeightenedTable(self):            # ovvero una tabella contenente i valori "assoluti" di latenza e snr;
+    def createWeightenedTable(self):  # ovvero una tabella contenente i valori "assoluti" di latenza e snr;
         dict_list = {}
         table_data = {}
         for key1 in self.nodes:
@@ -140,8 +141,8 @@ class Network:
                 pathLenght.append(0.0)
                 probe_signal = Signal_Information(0.001, path)
                 self.probe(path, pathLenght, probe_signal)
-                signal_data = {"Latency": pathLenght[0] / 200000, "Noise": math.pow(10, -9) * pathLenght[0], "Signal/Noise(dB)": 90 - 10 * math.log10(pathLenght[0])}
-                #signal_data = {"Latency": probe_signal.getLatency(), "Noise": probe_signal.getNoise(), "Signal/Noise(dB)": 10*math.log(0.001/probe_signal.getNoise())}
+                signal_data = {"Latency": pathLenght[0] / 200000, "Noise": math.pow(10, -9) * pathLenght[0],
+                               "Signal/Noise(dB)": 90 - 10 * math.log10(pathLenght[0])}
                 l = len(name)
                 s = ""
                 for n in name:
@@ -159,9 +160,9 @@ class Network:
     def stream(self, connectionList, label):
         for connection in connectionList:
             if label == "snr":
-                best = self.find_best_snr(connection.getInput(),connection.getOutput())
+                best = self.find_best_snr(connection.getInput(), connection.getOutput())
             else:
-                best = self.find_best_latency(connection.getInput(),connection.getOutput())
+                best = self.find_best_latency(connection.getInput(), connection.getOutput())
             if best is not None:
                 ch = self.findFreeChannel(best)
                 sign = Signal_Information(connection.getPower(), best.split("->"))
@@ -192,7 +193,7 @@ class Network:
 
         for columns in self.routeSpace:
             if searchedPath == columns:
-                for i in range(0,9):
+                for i in range(0, 9):
                     if self.routeSpace[columns][i] == 1:
                         return True
         return False
@@ -201,10 +202,9 @@ class Network:
 
         for columns in self.routeSpace:
             if path == columns:
-                for i in range(0,9):
+                for i in range(0, 9):
                     if self.routeSpace[columns][i] == 1:
                         return i
-
 
     def occupy(self, path, freq):
         nodelist = path.split("->")
@@ -326,17 +326,18 @@ class Network:
                         if bitrate >= matrix[node_name_list[n1]][node_name_list[n2]]:
                             matrix[node_name_list[n1]][node_name_list[n2]] = 0
                         else:
-                            matrix[node_name_list[n1]][node_name_list[n2]] = matrix[node_name_list[n1]][node_name_list[n2]] - bitrate
+                            matrix[node_name_list[n1]][node_name_list[n2]] = matrix[node_name_list[n1]][
+                                                                                 node_name_list[n2]] - bitrate
 
                         conn_list.append(connection)
-                    else:           #obbero se la connessione onn andava bene per il bitrae
+                    else:  # obbero se la connessione onn andava bene per il bitrae
                         tentativi = tentativi + 1
-                else:               # ovvero se best non è stato trovato (percorso non disponibile)
+                else:  # ovvero se best non è stato trovato (percorso non disponibile)
                     tentativi = tentativi + 1
-            else:                   # ovvero se è stata estratta una coppia tra i quali non c'è più disponibilità
+            else:  # ovvero se è stata estratta una coppia tra i quali non c'è più disponibilità
                 tentativi = tentativi + 1
             if tentativi == 100:
-                self.check_availability_and_fill_matrix( matrix, node_name_list, conn_list)
+                self.check_availability_and_fill_matrix(matrix, node_name_list, conn_list)
                 print("Rete satura")
                 flag = 0
         return conn_list
@@ -373,15 +374,15 @@ class Network:
         reg = re.compile("^" + re.escape(n1) + ".*" + re.escape(n2) + "$")
         for column in self.routeSpace:
             if re.search(reg, column) is not None:
-                for i in range(0,9):
+                for i in range(0, 9):
                     if self.routeSpace[column][i] == 1:
                         return column
         return None
 
-
     def update_logger(self, conn):
-        t = time.time_ns()%10000000000000
-        newrow= {"epoch time": t, "path": conn.getLight().getPath_with_arrow(), "channel ID": int(conn.getFrequency()), "bit rate": conn.getBitRate()}
+        t = time.time_ns() % 10000000000000
+        newrow = {"epoch time": t, "path": conn.getLight().getPath_with_arrow(), "channel ID": int(conn.getFrequency()),
+                  "bit rate": conn.getBitRate()}
         self.logger = self.logger.append(newrow, ignore_index=True)
 
 
@@ -403,22 +404,18 @@ class Network:
                 non_operative_lines.append(l)
         for index, row in self.logger.iterrows():
             for line in non_operative_lines:
-                reg = re.compile(".*" + re.escape(self.lines[line].getInNode().getLabel()) + "->" + re.escape(self.lines[line].getOutNode().getLabel()) + ".*")
+                reg = re.compile(".*" + re.escape(self.lines[line].getInNode().getLabel()) + "->" + re.escape(
+                    self.lines[line].getOutNode().getLabel()) + ".*")
                 if re.search(reg, row["path"]) is not None:
                     path = row["path"].split("->")
-                    startNode=path[0]
-                    endNode=path[len(path)-1]
+                    startNode = path[0]
+                    endNode = path[len(path) - 1]
                     matrix[startNode][endNode] = matrix[startNode][endNode] + row["bit rate"]
-                    for i in range(0,len(path)-1):
-                        self.lines[path[i] + path[i+1]].resetChannel(row["channel ID"])
+                    for i in range(0, len(path) - 1):
+                        self.lines[path[i] + path[i + 1]].resetChannel(row["channel ID"])
         self.check_lines_out_of_order()
-
-
-
 
     def check_lines_out_of_order(self):
         for l in self.lines:
             if self.lines[l].getServiceStatus() == 0:
                 self.lines[l].no_ch_avail()
-
-
