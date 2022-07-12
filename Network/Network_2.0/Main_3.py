@@ -3,14 +3,16 @@ from Connection import Connection
 import random
 import matplotlib.pyplot as plt
 import numpy as np
+import warnings
 
 
 class Main:
+    warnings.simplefilter(action='ignore', category=FutureWarning)
     network = Network("nodes.json")
     network.connect()
     connList = []
     nodesName = network.get_nodes_name()
-    # network.draw()
+
     l = len(nodesName)
     for i in range(100):
         n1 = n2 = 0

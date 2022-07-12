@@ -50,7 +50,7 @@ class Network:
             lis.append(node)
         return lis
 
-    def connect(self):  # aggiungo momentaneamente la creazione delle due tabelle qui
+    def connect(self):
         for key in self.nodes:
             node = self.nodes[key]
             for conn in node.connected_nodes:
@@ -60,7 +60,6 @@ class Network:
                     node.successive.update({conn: line})
         self.createRouteSpace()
         self.createWeightenedTable()
-        a = 6
 
     def find_path(self, nA, nB):
         nodeA = self.nodes[nA]
@@ -137,7 +136,7 @@ class Network:
             path_list = dict_list[key]
             for path in path_list:
                 name = path.copy()
-                pathLenght = []  # trucco stupido perchè pyton considera i float immutabili, le lliste no
+                pathLenght = []  # trucco stupido perchè pyton considera i float immutabili, le liste no
                 pathLenght.append(0.0)
                 probe_signal = Signal_Information(0.001, path)
                 self.probe(path, pathLenght, probe_signal)
@@ -167,16 +166,17 @@ class Network:
                 ch = self.findFreeChannel(best)
                 sign = Signal_Information(connection.getPower(), best.split("->"))
                 sign.setRS(self.get_Rs(best))
-                sign.setCnannel(ch)
+                sign.setChannel(ch)
                 connection.addLightPath(sign)
                 self.propagate(sign)
                 bitrate = self.calculateBitRate(sign, self.nodes[connection.getInput()].getTransceiverMode())
                 if bitrate != 0:
                     connection.setBitRate(bitrate)
+                    connection.setGSNR(self.calculateGSNR(sign))
                     connection.setSnr(self.weighted_paths[best]["Signal/Noise(dB)"])
                     connection.setLatency(self.weighted_paths[best]["Latency"])
                     self.occupy(best, connection.getFrequency())
-                # self.update_logger(connection)
+                    self.update_logger(connection)
                 else:
                     print("Connessione rifiutata")
 
@@ -264,7 +264,7 @@ class Network:
         GSNR = self.calculateGSNR(lp)
 
         if strategy == "shannon":
-            bitRate = 2 * Rs * math.log(1 + GSNR * (Rs / Bn), 2)
+            bitRate = 2 * Rs * math.log(1 + GSNR * (Rs / Bn), 2) / 1e9
         elif strategy == "flex-rate":
             if GSNR < t1:
                 bitRate = 0
@@ -312,7 +312,7 @@ class Network:
                     sign = Signal_Information(0.001, best.split("->"))
                     connection = Connection(node_name_list[n1], node_name_list[n2], 0.001)
                     sign.setRS(self.get_Rs(best))
-                    sign.setCnannel(ch)
+                    sign.setChannel(ch)
                     connection.addLightPath(sign)
                     self.propagate(sign)
                     bitrate = self.calculateBitRate(sign, self.nodes[connection.getInput()].getTransceiverMode())
@@ -330,7 +330,7 @@ class Network:
                                                                                  node_name_list[n2]] - bitrate
 
                         conn_list.append(connection)
-                    else:  # obbero se la connessione onn andava bene per il bitrae
+                    else:  # ovvero se la connessione onn andava bene per il bitrate
                         tentativi = tentativi + 1
                 else:  # ovvero se best non è stato trovato (percorso non disponibile)
                     tentativi = tentativi + 1
@@ -338,7 +338,6 @@ class Network:
                 tentativi = tentativi + 1
             if tentativi == 100:
                 self.check_availability_and_fill_matrix(matrix, node_name_list, conn_list)
-                print("Rete satura")
                 flag = 0
         return conn_list
 
@@ -353,7 +352,7 @@ class Network:
                         sign = Signal_Information(0.001, path.split("->"))
                         connection = Connection(node_list[i], node_list[j], 0.001)
                         sign.setRS(self.get_Rs(path))
-                        sign.setCnannel(ch)
+                        sign.setChannel(ch)
                         connection.addLightPath(sign)
                         self.propagate(sign)
                         bitrate = self.calculateBitRate(sign, self.nodes[connection.getInput()].getTransceiverMode())
@@ -385,7 +384,6 @@ class Network:
                   "bit rate": conn.getBitRate()}
         self.logger = self.logger.append(newrow, ignore_index=True)
 
-
     def strong_failure(self, label):
         self.lines[label].setOutOfOrder()
         node = list(label)
@@ -394,6 +392,20 @@ class Network:
             if re.search(reg, route) is not None:
                 for freq in range(0, 9):
                     self.routeSpace[route][freq] = 0
+
+    def strong_failureV2(self):
+        max = 0
+        most_occupied_line = None
+        for l in self.lines:
+            count = 0
+            for i in range(0, 10):
+                if self.lines[l].state[i] == 0:
+                    count += 1
+            if count > max:
+                max = count
+                most_occupied_line = l
+        print("Line failure: " + most_occupied_line)
+        self.strong_failure(most_occupied_line)
 
     def traffic_recovery(self, matrix):
         # dovrei valutare ogni log nel logger, verificare se è possibile spostare
@@ -419,3 +431,15 @@ class Network:
         for l in self.lines:
             if self.lines[l].getServiceStatus() == 0:
                 self.lines[l].no_ch_avail()
+
+    def usage(self):
+        tot = 0
+        used = 0
+
+        for path in self.routeSpace:
+            for i in range(0, 10):
+                if self.routeSpace[path][i] == 0:
+                    used = used + 1
+                tot = tot + 1
+
+        return (used / tot) * 100

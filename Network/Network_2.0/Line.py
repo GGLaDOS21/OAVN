@@ -16,6 +16,7 @@ class Line:
         self.n_amplifier = (length // 80000) + 2 #un amplificatore ogni 80 km, più quelli agli estremi
         self.gain = 16 #dB
         self.noiseFigure = 3 #dB    -> F
+        #self.noiseFigure = 5 #dB    -> F
         self.Bn = pow(12.5, 9)
         self.in_service = 1     #1->in service  0-> out of service
 
@@ -24,6 +25,7 @@ class Line:
         self.alpha = self.alpha_dB/(10* math.log10(np.e))
         self.L_eff = 1/self.alpha
         self.beta2_module = 2.13*pow(10, -26)  #(m*Hz^2)^-1
+        #self.beta2_module = 0.26*pow(10, -26)
         self.gamma = 1.27*pow(10, -3)  #(m*W)^-1
         self.Rs = 32*pow(10, 9)    #Hz, giga
         self.df = 50*pow(10, 9)    #Hz, giga
@@ -44,14 +46,12 @@ class Line:
         # signal.noisePowUpdate(signal.signal_power * self.length * math.pow(10, -9)) vecchia versione
         #nuova versione:
 
-        #noise = 2/3 * pow(2 * self.nu_nli * self.Bn * pow(self.noiseFigure * self.L_eff * self.ase * self.Bn, 2) ,1/3)
-        #signal.noisePowUpdate (self.ase * self.Bn + self.nu_nli * pow(signal.getPower(), 3))  #di questo non sono sicuro, (Pase + nuNli*Pch^3) -> ottengo il rumore e basta
-        signal.noisePowUpdate(self.ase + self.nli_generation(signal.getPower()))     #-> aggiornop aggiungendo l'ISNR, quindi viene fatta la sommatoria
+        signal.noisePowUpdate(self.ase + self.nli_generation(signal.getPower()))
 
 
     def propagate(self, signal):
         self.latency_generation(signal)
-        self.optimized_launch_power(signal)
+        self.optimized_launch_power()
         self.nli_generation(signal.getPower())
         signal.setPower(self.opt_pow)
         self.noise_generation(signal)
@@ -84,7 +84,7 @@ class Line:
     def probe(self, path, pathLenght, signal):      #usato per creare la weightened table
         pathLenght[0] += self.length
         self.latency_generation(signal)
-        self.optimized_launch_power(signal)
+        self.optimized_launch_power()
         self.nli_generation(signal.getPower())
         signal.setPower(self.opt_pow)
         self.noise_generation(signal)
@@ -107,16 +107,15 @@ class Line:
         NLI = (float(power)**3) * self.nu_nli * Nspan * Bn
         return NLI
 
-    def optimized_launch_power(self,signal):       #NOTA: problema: nelle richieste delle slide, viene detto di chiamare il metodo in propagate di Node; tuttavia, calcolato in questo modo, il launch power
-                                            #è indipendente dal nodo o dal segnale specifico da cui è lanciato; non ha dunque senso ricalcolarlo ad ogni propagate
+    def optimized_launch_power(self):
         F = 10 ** (self.noiseFigure / 10)
         G = 10 ** (self.gain / 10)
         f0 = 193.414 * pow(10,12)
         Nspan = self.n_amplifier - 1
         Bn = 12.5 * pow(10,9)
 
-        pow1 = ( (F * f0 * con.h * G) / (2 * self.nu_nli)) **(1/3)
-        pow2 = (-self.ase / (self.nu_nli - 3 * self.nu_nli * Nspan *Bn)) ** (1/3)
+        #pow1 = ( (F * f0 * con.h * G) / (2 * self.nu_nli)) **(1/3)
+        pow2 = (-self.ase / (self.nu_nli - 3 * self.nu_nli * Nspan *Bn)) ** (1/3)       #formula calcolata derivando la potenza e poenendola uguale a 0
         self.opt_pow = pow2
 
     def setOutOfOrder(self):

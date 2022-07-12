@@ -17,18 +17,25 @@ class Signal_Information: #AKA lightpath
 
     def getLatency(self):
         return self.latency
+
     def getNoise(self):
         return self.noise_power
+
     def getPower(self):
         return self.signal_power
+
     def getRs(self):
         return self.Rs
-    def setRS(self,rs):
+
+    def setRS(self, rs):
         self.Rs = rs
-    def setCnannel(self, channel):
+
+    def setChannel(self, channel):
         self.channel = channel
+
     def getChannel(self):
         return self.channel
+
     def setPower(self, power):
         self.signal_power = power
 
@@ -37,8 +44,6 @@ class Signal_Information: #AKA lightpath
 
     def latencyUpdate(self, increment):
         self.latency += increment
-
-
 
     def nextHop(self):
         if len(self.path) == self.pos:

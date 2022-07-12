@@ -2,7 +2,7 @@ from Network import Network
 from Connection import Connection
 import random
 import warnings
-import matplotlib.pyplot as plt
+import math
 
 
 
@@ -24,15 +24,20 @@ class Main:
                                             #plot bitrate transceiver method
     network.stream(connList, "snr")
     plotList2= []
+    capacity = 0
     sum = 0
     n = 0
     for conn in connList:
-        if conn.getBitRate() != 0:
-            sum += conn.getBitRate()
+        if conn.getGSNR() != 0:
+
+            sum += 10* math.log10(conn.getGSNR())
             n += 1
-            plotList2.append(conn.getBitRate())
-    plt.figure(2)
-    plt.hist(plotList2, bins= 25)
-    print ("Media: ")
+        if conn.getBitRate() != 0:
+            capacity += conn.getBitRate()
+
+
+    print ("GSNR Medio: ")
     print (sum / n)
-    plt.show()
+    print ("Capacità: ")
+    print (capacity)
+

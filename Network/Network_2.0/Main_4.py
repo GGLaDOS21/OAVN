@@ -1,4 +1,4 @@
-import scipy
+import scipy.special
 import matplotlib.pyplot as plt
 import numpy as np
 import math
@@ -36,7 +36,7 @@ class Main:
             BR2.append(400)
 
     for i in GSNR:
-        BR3.append(2 * Rs * math.log(1 + i * (Rs / Bn), 2))
+        BR3.append(2 * Rs * math.log(1 + i * (Rs / Bn), 2) / 1e9)
 
     #creating GSNR list for plotting
     l_GSNR = []

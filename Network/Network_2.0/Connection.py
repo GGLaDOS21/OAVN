@@ -2,6 +2,7 @@
 
 class Connection:
     def __init__(self, input_node, output_node, signal_power):
+        self.GSNR = 0
         self.LightPath = None
         self.input = input_node
         self.output = output_node
@@ -32,6 +33,12 @@ class Connection:
     def getLatency(self):
         return self.latency
 
+    def setGSNR(self, gsnr):
+        self.GSNR = gsnr
+
+    def getGSNR(self):
+        return self.GSNR
+
     def setSnr(self, snr):
         self.snr = snr
 
@@ -42,7 +49,7 @@ class Connection:
         self.bitRate = bitRate
 
     def getBitRate(self):
-        return  self.bitRate
+        return self.bitRate
 
     def addLightPath(self, lp):
         self.LightPath = lp

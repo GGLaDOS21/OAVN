@@ -13,11 +13,12 @@ class Node:
 
     def getLabel(self):
         return self.label
+
     def getTransceiverMode(self):
         return self.transceiver
+
     def setTransceiverMode(self, mode):
         self.transceiver = mode
-
 
     def propagate(self, signal):
         nextNode = signal.nextHop()
@@ -27,7 +28,6 @@ class Node:
             if nodes == nextNode:
                 self.successive[nextNode].propagate(signal)
                 break
-
 
     def probe(self, path, pathLenght, signal):          #usato pre creare la weightened table
         if len(path) == 0:
